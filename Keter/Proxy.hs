@@ -57,12 +57,17 @@ reverseProxy useHeader timeBound manager hostLookup listener =
     (run, isSecure) =
         case listener of
             LPInsecure host port -> (Warp.runSettings (warp host port), False)
-            LPSecure host port cert chainCerts key -> (WarpTLS.runTLS
-                (connectClientCertificates hostLookup $ WarpTLS.tlsSettingsChain
+            LPSecure host port cert chainCerts key -> (\x -> do
+            dhparams <- WarpTLS.generateParams 2048 2
+            WarpTLS.runTLS
+                (setupDHEParams dhparams . connectClientCertificates hostLookup $ WarpTLS.tlsSettingsChain
                     cert
                     (V.toList chainCerts)
                     key)
-                (warp host port), True)
+                (warp host port) x, True)
+
+setupDHEParams :: WarpTLS.Params -> WarpTLS.TLSSettings -> WarpTLS.TLSSettings
+setupDHEParams p s = s {WarpTLS.tlsServerDHEParams = Just p}
 
 connectClientCertificates :: HostLookup -> WarpTLS.TLSSettings -> WarpTLS.TLSSettings
 connectClientCertificates hl s =
